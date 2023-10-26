@@ -11,7 +11,9 @@ import (
 
 	_ "embed"
 
+	"github.com/a-h/parse"
 	"github.com/a-h/templ/parser/v2"
+	"github.com/a-h/templ/parser/v2/goliteral"
 )
 
 func Generate(template parser.TemplateFile, w io.Writer) (sm *parser.SourceMap, err error) {
@@ -61,10 +63,11 @@ func (g *generator) writePackage() error {
 	var r parser.Range
 	var err error
 	// package ...
-	if r, err = g.w.Write(g.tf.Package.Expression.Value + "\n\n"); err != nil {
+	exp := rewriteExpression(g.tf.Package.Expression)
+	if r, err = g.w.Write(exp.Value + "\n\n"); err != nil {
 		return err
 	}
-	g.sourceMap.Add(g.tf.Package.Expression, r)
+	g.sourceMap.Add(exp, r)
 	if _, err = g.w.Write("//lint:file-ignore SA4006 This context is only used if a nested component is present.\n\n"); err != nil {
 		return err
 	}
@@ -154,10 +157,11 @@ func (g *generator) writeCSS(n parser.CSSTemplate) error {
 	if _, err = g.w.Write("func "); err != nil {
 		return err
 	}
+	exp := rewriteExpression(n.Name)
 	if r, err = g.w.Write(n.Name.Value); err != nil {
 		return err
 	}
-	g.sourceMap.Add(n.Name, r)
+	g.sourceMap.Add(exp, r)
 	// () templ.CSSClass {
 	if _, err = g.w.Write("() templ.CSSClass {\n"); err != nil {
 		return err
@@ -180,10 +184,11 @@ func (g *generator) writeCSS(n parser.CSSTemplate) error {
 				if _, err = g.w.WriteIndent(indentLevel, fmt.Sprintf("templ_7745c5c3_CSSBuilder.WriteString(string(templ.SanitizeCSS(`%s`, ", p.Name)); err != nil {
 					return err
 				}
-				if r, err = g.w.Write(p.Value.Expression.Value); err != nil {
+				exp := rewriteExpression(p.Value.Expression)
+				if r, err = g.w.Write(exp.Value); err != nil {
 					return err
 				}
-				g.sourceMap.Add(p.Value.Expression, r)
+				g.sourceMap.Add(exp, r)
 				if _, err = g.w.Write(")))\n"); err != nil {
 					return err
 				}
@@ -223,11 +228,12 @@ func (g *generator) writeCSS(n parser.CSSTemplate) error {
 }
 
 func (g *generator) writeGoExpression(n parser.GoExpression) (err error) {
-	r, err := g.w.Write(n.Expression.Value)
+	exp := rewriteExpression(n.Expression)
+	r, err := g.w.Write(exp.Value)
 	if err != nil {
 		return err
 	}
-	g.sourceMap.Add(n.Expression, r)
+	g.sourceMap.Add(exp, r)
 	if _, err = g.w.WriteIndent(0, "\n\n"); err != nil {
 		return err
 	}
@@ -270,10 +276,11 @@ func (g *generator) writeTemplate(nodeIdx int, t parser.HTMLTemplate) error {
 		return err
 	}
 	// (r *Receiver) Name(params []string)
-	if r, err = g.w.Write(t.Expression.Value); err != nil {
+	exp := rewriteExpression(t.Expression)
+	if r, err = g.w.Write(exp.Value); err != nil {
 		return err
 	}
-	g.sourceMap.Add(t.Expression, r)
+	g.sourceMap.Add(exp, r)
 	// templ.Component {
 	if _, err = g.w.Write(" templ.Component {\n"); err != nil {
 		return err
@@ -506,10 +513,11 @@ func (g *generator) writeIfExpression(indentLevel int, n parser.IfExpression) (e
 		return err
 	}
 	// x == y {
-	if r, err = g.w.Write(n.Expression.Value); err != nil {
+	exp := rewriteExpression(n.Expression)
+	if r, err = g.w.Write(exp.Value); err != nil {
 		return err
 	}
-	g.sourceMap.Add(n.Expression, r)
+	g.sourceMap.Add(exp, r)
 	// {
 	if _, err = g.w.Write(` {` + "\n"); err != nil {
 		return err
@@ -527,10 +535,11 @@ func (g *generator) writeIfExpression(indentLevel int, n parser.IfExpression) (e
 			return err
 		}
 		// x == y {
-		if r, err = g.w.Write(elseIf.Expression.Value); err != nil {
+		exp := rewriteExpression(elseIf.Expression)
+		if r, err = g.w.Write(exp.Value); err != nil {
 			return err
 		}
-		g.sourceMap.Add(elseIf.Expression, r)
+		g.sourceMap.Add(exp, r)
 		// {
 		if _, err = g.w.Write(` {` + "\n"); err != nil {
 			return err
@@ -570,10 +579,11 @@ func (g *generator) writeSwitchExpression(indentLevel int, n parser.SwitchExpres
 		return err
 	}
 	// val
-	if r, err = g.w.Write(n.Expression.Value); err != nil {
+	exp := rewriteExpression(n.Expression)
+	if r, err = g.w.Write(exp.Value); err != nil {
 		return err
 	}
-	g.sourceMap.Add(n.Expression, r)
+	g.sourceMap.Add(exp, r)
 	// {
 	if _, err = g.w.Write(` {` + "\n"); err != nil {
 		return err
@@ -583,10 +593,11 @@ func (g *generator) writeSwitchExpression(indentLevel int, n parser.SwitchExpres
 		for _, c := range n.Cases {
 			// case x:
 			// default:
-			if r, err = g.w.WriteIndent(indentLevel, c.Expression.Value); err != nil {
+			exp := rewriteExpression(c.Expression)
+			if r, err = g.w.WriteIndent(indentLevel, exp.Value); err != nil {
 				return err
 			}
-			g.sourceMap.Add(c.Expression, r)
+			g.sourceMap.Add(exp, r)
 			indentLevel++
 			if err = g.writeNodes(indentLevel, stripLeadingAndTrailingWhitespace(c.Children)); err != nil {
 				return err
@@ -657,10 +668,11 @@ func (g *generator) writeBlockTemplElementExpression(indentLevel int, n parser.T
 	if _, err = g.w.WriteIndent(indentLevel, `templ_7745c5c3_Err = `); err != nil {
 		return err
 	}
-	if r, err = g.w.Write(n.Expression.Value); err != nil {
+	exp := rewriteExpression(n.Expression)
+	if r, err = g.w.Write(exp.Value); err != nil {
 		return err
 	}
-	g.sourceMap.Add(n.Expression, r)
+	g.sourceMap.Add(exp, r)
 	// .Render(templ.WithChildren(templ_7745c5c3_Ctx, children), templ_7745c5c3_Buffer)
 	if _, err = g.w.Write(".Render(templ.WithChildren(templ_7745c5c3_Ctx, " + childrenName + "), templ_7745c5c3_Buffer)\n"); err != nil {
 		return err
@@ -677,10 +689,11 @@ func (g *generator) writeSelfClosingTemplElementExpression(indentLevel int, n pa
 	}
 	// Template expression.
 	var r parser.Range
-	if r, err = g.w.Write(n.Expression.Value); err != nil {
+	exp := rewriteExpression(n.Expression)
+	if r, err = g.w.Write(exp.Value); err != nil {
 		return err
 	}
-	g.sourceMap.Add(n.Expression, r)
+	g.sourceMap.Add(exp, r)
 	// .Render(templ_7745c5c3_Ctx, templ_7745c5c3_Buffer)
 	if _, err = g.w.Write(".Render(templ_7745c5c3_Ctx, templ_7745c5c3_Buffer)\n"); err != nil {
 		return err
@@ -697,10 +710,11 @@ func (g *generator) writeCallTemplateExpression(indentLevel int, n parser.CallTe
 	}
 	// Template expression.
 	var r parser.Range
-	if r, err = g.w.Write(n.Expression.Value); err != nil {
+	exp := rewriteExpression(n.Expression)
+	if r, err = g.w.Write(exp.Value); err != nil {
 		return err
 	}
-	g.sourceMap.Add(n.Expression, r)
+	g.sourceMap.Add(exp, r)
 	// .Render(templ_7745c5c3_Ctx, templ_7745c5c3_Buffer)
 	if _, err = g.w.Write(".Render(templ_7745c5c3_Ctx, templ_7745c5c3_Buffer)\n"); err != nil {
 		return err
@@ -718,10 +732,11 @@ func (g *generator) writeForExpression(indentLevel int, n parser.ForExpression) 
 		return err
 	}
 	// i, v := range p.Stuff
-	if r, err = g.w.Write(n.Expression.Value); err != nil {
+	exp := rewriteExpression(n.Expression)
+	if r, err = g.w.Write(exp.Value); err != nil {
 		return err
 	}
-	g.sourceMap.Add(n.Expression, r)
+	g.sourceMap.Add(exp, r)
 	// {
 	if _, err = g.w.Write(` {` + "\n"); err != nil {
 		return err
@@ -850,10 +865,11 @@ func (g *generator) writeAttributeCSS(indentLevel int, attr parser.ExpressionAtt
 		return
 	}
 	// p.Name()
-	if r, err = g.w.Write(attr.Expression.Value); err != nil {
+	exp := rewriteExpression(attr.Expression)
+	if r, err = g.w.Write(exp.Value); err != nil {
 		return
 	}
-	g.sourceMap.Add(attr.Expression, r)
+	g.sourceMap.Add(exp, r)
 	// }\n
 	if _, err = g.w.Write("}\n"); err != nil {
 		return
@@ -962,10 +978,11 @@ func (g *generator) writeBoolExpressionAttribute(indentLevel int, attr parser.Bo
 	}
 	// x == y
 	var r parser.Range
-	if r, err = g.w.Write(attr.Expression.Value); err != nil {
+	exp := rewriteExpression(attr.Expression)
+	if r, err = g.w.Write(exp.Value); err != nil {
 		return err
 	}
-	g.sourceMap.Add(attr.Expression, r)
+	g.sourceMap.Add(exp, r)
 	// {
 	if _, err = g.w.Write(` {` + "\n"); err != nil {
 		return err
@@ -1003,10 +1020,11 @@ func (g *generator) writeExpressionAttribute(indentLevel int, elementName string
 		}
 		// p.Name()
 		var r parser.Range
-		if r, err = g.w.Write(attr.Expression.Value); err != nil {
+		exp := rewriteExpression(attr.Expression)
+		if r, err = g.w.Write(exp.Value); err != nil {
 			return err
 		}
-		g.sourceMap.Add(attr.Expression, r)
+		g.sourceMap.Add(exp, r)
 		if _, err = g.w.Write("\n"); err != nil {
 			return err
 		}
@@ -1026,10 +1044,11 @@ func (g *generator) writeExpressionAttribute(indentLevel int, elementName string
 			}
 			// p.Name()
 			var r parser.Range
-			if r, err = g.w.Write(attr.Expression.Value); err != nil {
+			exp := rewriteExpression(attr.Expression)
+			if r, err = g.w.Write(exp.Value); err != nil {
 				return err
 			}
-			g.sourceMap.Add(attr.Expression, r)
+			g.sourceMap.Add(exp, r)
 			if _, err = g.w.Write("\n"); err != nil {
 				return err
 			}
@@ -1046,10 +1065,11 @@ func (g *generator) writeExpressionAttribute(indentLevel int, elementName string
 			}
 			// p.Name()
 			var r parser.Range
-			if r, err = g.w.Write(attr.Expression.Value); err != nil {
+			exp := rewriteExpression(attr.Expression)
+			if r, err = g.w.Write(exp.Value); err != nil {
 				return err
 			}
-			g.sourceMap.Add(attr.Expression, r)
+			g.sourceMap.Add(exp, r)
 			// ))
 			if _, err = g.w.Write("))\n"); err != nil {
 				return err
@@ -1073,10 +1093,11 @@ func (g *generator) writeConditionalAttribute(indentLevel int, elementName strin
 	}
 	// x == y
 	var r parser.Range
-	if r, err = g.w.Write(attr.Expression.Value); err != nil {
+	exp := rewriteExpression(attr.Expression)
+	if r, err = g.w.Write(exp.Value); err != nil {
 		return err
 	}
-	g.sourceMap.Add(attr.Expression, r)
+	g.sourceMap.Add(exp, r)
 	// {
 	if _, err = g.w.Write(` {` + "\n"); err != nil {
 		return err
@@ -1190,10 +1211,11 @@ func (g *generator) writeStringExpression(indentLevel int, e parser.Expression) 
 		return err
 	}
 	// p.Name()
-	if r, err = g.w.Write(e.Value + "\n"); err != nil {
+	exp := rewriteExpression(e)
+	if r, err = g.w.Write(exp.Value + "\n"); err != nil {
 		return err
 	}
-	g.sourceMap.Add(e, r)
+	g.sourceMap.Add(exp, r)
 	// _, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(vn)
 	if _, err = g.w.WriteIndent(indentLevel, "_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString("+vn+"))\n"); err != nil {
 		return err
@@ -1323,4 +1345,73 @@ func stripTypes(parameters string) string {
 		variableNames = append(variableNames, strings.TrimSpace(p[0]))
 	}
 	return strings.Join(variableNames, ", ")
+}
+
+// rewriteExpression replaces calls to the templ.Context() function with the
+// internal templ context variable.
+//
+// This allows templates to collect the context object without having to
+// explicitly pass it in, or have an implicit variable in the template.
+//
+// Since Go code may contain string literals that include the text "templ.Context()",
+// we only replace the function call outside of a string literal.
+func rewriteExpression(input parser.Expression) (exp parser.Expression) {
+	var sb strings.Builder
+
+	pi := parse.NewInput(input.Value)
+	lastIndex := 0
+	for {
+		// Read up until the start of a possible string literal.
+		var c string
+		c, ok := pi.Peek(1)
+		if !ok {
+			break
+		}
+		if rune(c[0]) == 65533 { // Invalid Unicode.
+			return input
+		}
+		if c[0] == '"' || c[0] == '`' {
+			if pi.Index() > lastIndex {
+				sb.WriteString(replaceTemplContextFunction(input.Value[lastIndex:pi.Index()]))
+				lastIndex = pi.Index()
+			}
+			// Read until the end of the string literal.
+			result, ok, err := goliteral.String.Parse(pi)
+			// If we have an invalid string literal, it is used without modification.
+			if err != nil || !ok {
+				return input
+			}
+			sb.WriteString(result)
+			lastIndex = pi.Index()
+			continue
+		}
+		pi.Take(1)
+	}
+	// Get any trailing chars.
+	if pi.Index() > lastIndex {
+		sb.WriteString(replaceTemplContextFunction(input.Value[lastIndex:pi.Index()]))
+	}
+
+	// Calculate updated position by using the size of the string builder ouptut.
+	// We won't have added any new lines, so the only difference will be if the final
+	// line is longer than the original.
+	newLastIndex := input.Range.From.Index + int64(len(sb.String()))
+	newLines := strings.Split(sb.String(), "\n")
+	newLastLineLength := uint32(len(newLines[len(newLines)-1]))
+
+	return parser.Expression{
+		Value: sb.String(),
+		Range: parser.Range{
+			From: input.Range.From,
+			To: parser.Position{
+				Index: newLastIndex,
+				Line:  input.Range.To.Line,
+				Col:   newLastLineLength,
+			},
+		},
+	}
+}
+
+func replaceTemplContextFunction(s string) string {
+	return strings.Replace(s, "templ.Context()", "templ_7745c5c3_Ctx", -1)
 }

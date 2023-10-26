@@ -36,13 +36,13 @@ func (cf ComponentFunc) Render(ctx context.Context, w io.Writer) error {
 }
 
 func WithChildren(ctx context.Context, children Component) context.Context {
-	ctx, v := getContext(ctx)
+	ctx, v := getOrInitContext(ctx)
 	v.children = &children
 	return ctx
 }
 
 func ClearChildren(ctx context.Context) context.Context {
-	_, v := getContext(ctx)
+	_, v := getOrInitContext(ctx)
 	v.children = nil
 	return ctx
 }
@@ -52,7 +52,7 @@ var NopComponent = ComponentFunc(func(ctx context.Context, w io.Writer) error { 
 
 // GetChildren from the context.
 func GetChildren(ctx context.Context) Component {
-	_, v := getContext(ctx)
+	_, v := getOrInitContext(ctx)
 	if v.children == nil {
 		return NopComponent
 	}
@@ -332,7 +332,7 @@ func (cssm CSSMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Add registered classes to the context.
-	ctx, v := getContext(r.Context())
+	ctx, v := getOrInitContext(r.Context())
 	for _, c := range cssm.CSSHandler.Classes {
 		v.addClass(c.ID)
 	}
@@ -380,7 +380,7 @@ func RenderCSSItems(ctx context.Context, w io.Writer, classes ...any) (err error
 	if len(classes) == 0 {
 		return nil
 	}
-	_, v := getContext(ctx)
+	_, v := getOrInitContext(ctx)
 	sb := new(strings.Builder)
 	renderCSSItemsToBuilder(sb, v, classes...)
 	if sb.Len() > 0 {
@@ -535,7 +535,12 @@ func InitializeContext(ctx context.Context) context.Context {
 	return ctx
 }
 
-func getContext(ctx context.Context) (context.Context, *contextValue) {
+// Context returns the implicit rendering context.
+func Context() context.Context {
+	return context.Background()
+}
+
+func getOrInitContext(ctx context.Context) (context.Context, *contextValue) {
 	v, ok := ctx.Value(contextKey).(*contextValue)
 	if !ok {
 		ctx = InitializeContext(ctx)
@@ -560,7 +565,7 @@ func RenderScriptItems(ctx context.Context, w io.Writer, scripts ...ComponentScr
 	if len(scripts) == 0 {
 		return nil
 	}
-	_, v := getContext(ctx)
+	_, v := getOrInitContext(ctx)
 	sb := new(strings.Builder)
 	for _, s := range scripts {
 		if !v.hasScriptBeenRendered(s.Name) {

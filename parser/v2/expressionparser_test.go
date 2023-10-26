@@ -43,67 +43,6 @@ import (
 //  If EOF, break
 // If brace count != 0 throw an error
 
-func TestRuneLiterals(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{
-			name:     "rune literal with escaped newline",
-			input:    `'\n' `,
-			expected: `'\n'`,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			actual, ok, err := rune_lit.Parse(parse.NewInput(tt.input))
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			if !ok {
-				t.Fatalf("unexpected failure for input %q", tt.input)
-			}
-			if diff := cmp.Diff(tt.expected, actual); diff != "" {
-				t.Error(diff)
-			}
-		})
-	}
-}
-
-func TestStringLiterals(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{
-			name:     "string literal with escaped newline",
-			input:    `"\n" `,
-			expected: `"\n"`,
-		},
-		{
-			name:     "raw literal with \n",
-			input:    "`\\n` ",
-			expected: "`\\n`",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			actual, ok, err := string_lit.Parse(parse.NewInput(tt.input))
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if !ok {
-				t.Fatalf("unexpected failure for input %q", tt.input)
-			}
-			if diff := cmp.Diff(tt.expected, actual); diff != "" {
-				t.Error(diff)
-			}
-		})
-	}
-}
-
 func TestExpressions(t *testing.T) {
 	tests := []struct {
 		name            string
